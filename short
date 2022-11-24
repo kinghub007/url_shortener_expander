@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+
+usage()
+{
+  cat <<EOF
+Short
+Description: Shorten urls and unmask shortended urls.
+Usage: short [flag] [URL] or short [flag]
+  -s  Shorten the URL
+  -e  Expand a shortened URL
+  -u  Update Bash-Snippet Tools
+  -h  Show the help
+  -v  Get the tool version
+Example:
+   Input:  short tinyurl.com/jhkj
+   Output: http://possiblemaliciouswebsiteornot.com
+EOF
+}
+
+getConfiguredClient()
+{
+	if  command -v curl &>/dev/null; then
+		configuredClient="curl"
+        elif command -v wget &>/dev/null; then
+		configuredClient="wget"
+	elif command -v http &>/dev/null; then
+		configuredClient="httpie"
+	elif command -v fetch &>/dev/null; then
+		configuredClient="fetch"
+	else
+		echo "Error: This tool requires either curl, wget, httpie or fetch to be installed." >&2
+		return 1
+	fi
+}
+
+httpGet()
+{
+	case "$configuredClient" in
+		curl)  curl -A curl -s "$@" ;;
+		wget)  wget -qO- "$@" ;;
+		httpie) http -b GET "$@" ;;
+		fetch) fetch -q "$@" ;;
+	esac
+}
+
+expandURL()
+{
+  testURL=$( echo "$1" | cut -c1-8 )
+  if [[ $testURL != "https://" ]]; then
+    testURL=$( echo "$1" | cut -c1-7 )
+    if [[ $testURL != "http://" ]]; then
+      url="http://$1"
+    else
+      url=$1
+    fi
+  else
+    url=$1
+  fi
+  response=$(httpGet https://unshorten.me/s/"$url")
+  errorCheck=$(echo "$response")
+  if [[ $errorCheck == "Invalid Short URL" ]]; then
+  echo "Error: 404 could not find the website"
+  return 1
+fi
+  returnedURL=$(echo "$response")
+}
+
+shortenURL()
+{
+newURL=$1
+if [[ $(echo "$1" | grep -Eo "^[h]ttp[s]?://") == "" ]]; then newURL="http://"$1; fi
+response=$(httpGet http://tinyurl.com/api-create.php?url="$newURL")
+returnedURL=$(echo "$response")
+}
+
+printResults()
+{
+  cat <<EOF
+=====================================================================
+Short URL:    $inputURL
+Expanded URL: $returnedURL
+=====================================================================
+EOF
+}
+
+printShortenedResults()
+{
+  cat <<EOF
+=====================================================================
+Original URL:  $newURL
+Shortened URL: $returnedURL
+=====================================================================
+EOF
+}
+
+getConfiguredClient || exit 1
+
+while getopts "e:s:uvh" opt; do
+  case "$opt" in
+    \?) echo "Invalid option: -$OPTARG" >&2
+        exit 1
+        ;;
+    e)
+        expand="true"
+        inputURL=$OPTARG
+        ;;
+    s)
+        shorten="true"
+        inputURL=$OPTARG
+        ;;
+    h)  usage
+        exit 0
+        ;;
+    :)  echo "Option -$OPTARG requires an argument." >&2
+        exit 1
+        ;;
+  esac
+done
+
+if  [[ $expand == "true" && $shorten == "true" ]];then
+  echo "Error: the -e and the -s options are mutually exclusive" >&2
+  exit 1
+fi
+
+if [[ $# == 0 ]]; then
+  usage
+  exit 0
+elif [[ $# == "1" ]]; then
+  if [[ $1 == "help" ]]; then
+    usage
+
+  else
+    usage
+    exit 1
+  fi
+elif [[ $expand == "true" ]];then
+  expandURL "$inputURL" || exit 1
+  printResults
+elif [[ $shorten == "true" ]];then
+  if [[ $configuredClient != "curl" ]];then
+    echo "Error: to shorten URLS you must have curl installed"
+  fi
+  shortenURL "$inputURL"
+  printShortenedResults
+else
+  echo "Error: short only accepts one argument"
+  exit 1
+fi
+
