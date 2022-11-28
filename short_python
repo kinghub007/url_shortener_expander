@@ -1,0 +1,23 @@
+#!/usr/bin/env python3 
+
+import pyshorteners
+
+choice = int(input("Please Enter:\n\t1 - To shorten a link\n\t2 - To exapnd a link\n\nNumber entered: "))
+u = pyshorteners.Shortener()
+
+def short():
+    link = input("\nEnter the link to be shortened: ")
+    shortened_link = u.tinyurl.short(link)
+    print("\nThe Shortened Link is: " + shortened_link)
+    
+def expand():
+       link = input("\nEnter the link to be expanded: ")
+       expanded_link = u.tinyurl.expand(link)
+       print("\nThe Expanded Link is: " + expanded_link)
+
+if choice == 1:
+    short()
+elif choice == 2:
+    expand()
+else:
+    print("\nWrong Entry. Please enter the number 1 or 2.")
